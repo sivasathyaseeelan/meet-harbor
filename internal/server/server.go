@@ -2,33 +2,34 @@ package server
 
 import (
 	"flag"
-	"meet-harbor/internal/handlers"
-	w "meet-harbour/pkg/webrtc"
 	"os"
 	"time"
 
-	"github.com/gobiber/templete/html"
-	"github.com/gofiber/fiber/middleware/logger"
+	"meet-harbor/internal/handlers"
+	w "meet-harbor/pkg/webrtc"
+
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/mmiddleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/template/html"
 	"github.com/gofiber/websocket/v2"
 )
 
 var (
-	addr = flag.String{"addr", ":" + os.Getenv("PORT"), ""}
-	cert = flag.String("cert", "" , "")
-	key = flag.String("key", "")
+	addr = flag.String("addr", ":"+os.Getenv("PORT"), "")
+	cert = flag.String("cert", "", "")
+	key  = flag.String("key", "", "")
 )
 
 func Run() error {
 	flag.Parse()
 
 	if *addr == ":" {
-		*addr = ":8000"
+		*addr = ":8080"
 	}
 
-	endin := html.New("./views", ".html")
-	app := fiber.New(fiber.Config(Views: engine))
+	engine := html.New("./views", ".html")
+	app := fiber.New(fiber.Config{Views: engine})
 	app.Use(logger.New())
 	app.Use(cors.New())
 
@@ -36,31 +37,31 @@ func Run() error {
 	app.Get("/room/create", handlers.RoomCreate)
 	app.Get("/room/:uuid", handlers.Room)
 	app.Get("/room/:uuid/websocket", websocket.New(handlers.RoomWebsocket, websocket.Config{
-		HandshakeTimeout: 10*time.second,
+		HandshakeTimeout: 10 * time.Second,
 	}))
 	app.Get("/room/:uuid/chat", handlers.RoomChat)
-	app.Get("/room/:uuid/chat/websocket", websocket.New(handlers.RoomChatwebsocket))
-	app.Get("/room/:uuid/viewers/websocket",websocket.New(handlers.RoomVIewwebsockets))
-	app.Get("/stream/:ssuid", )
-	app.Get("/stream/:ssuid/websocket", websocket.New(handlers.StreamWebsocket, wesocket.Config(
-		HandshakeTimeout: 10*time.second,
-	)))
-	app.Get("/stream/:ssuid/chat/websocket", websocket.New(handlers.StreamChatwebsocket))
-	app.Get("/stream/:ssuid/viewer/websocket", webSocket.New(handlers.StreamViewerWebsockert))
-	app.Static("/", "../assets")
+	app.Get("/room/:uuid/chat/websocket", websocket.New(handlers.RoomChatWebsocket))
+	app.Get("/room/:uuid/viewer/websocket", websocket.New(handlers.RoomViewerWebsocket))
+	app.Get("/stream/:suuid", handlers.Stream)
+	app.Get("/stream/:suuid/websocket", websocket.New(handlers.StreamWebsocket, websocket.Config{
+		HandshakeTimeout: 10 * time.Second,
+	}))
+	app.Get("/stream/:suuid/chat/websocket", websocket.New(handlers.StreamChatWebsocket))
+	app.Get("/stream/:suuid/viewer/websocket", websocket.New(handlers.StreamViewerWebsocket))
+	app.Static("/", "./assets")
 
-	w.Room = make(map[string]*w.Room)
-	w.Stream = make(map[string]*w.room)
-	go  dispatchKeyFrame()
-	if *cert = ""{
+	w.Rooms = make(map[string]*w.Room)
+	w.Streams = make(map[string]*w.Room)
+	go dispatchKeyFrames()
+	if *cert != "" {
 		return app.ListenTLS(*addr, *cert, *key)
 	}
 	return app.Listen(*addr)
 }
 
-func dispatchKeyFrame(){
-	for range time.NewTicker((time.Second*3)).C{
-		for _, room := range w.Rooms{
+func dispatchKeyFrames() {
+	for range time.NewTicker(time.Second * 3).C {
+		for _, room := range w.Rooms {
 			room.Peers.DispatchKeyFrame()
 		}
 	}
